@@ -3,6 +3,7 @@ from torch import nn
 from .base_model import BaseModel
 from .deep_ac import calculate_basic_line_data
 
+
 class SingleSoftHistograms(BaseModel):
     eps = 1e-7
 
@@ -13,7 +14,7 @@ class SingleSoftHistograms(BaseModel):
         'num_channel': 3,
         'unconsidered_line_length': 1,
         'considered_line_length': 18,
-        
+
         # 'differentiable': True
     }
 
@@ -31,7 +32,7 @@ class SingleSoftHistograms(BaseModel):
         self.total_hist_size = 1
         for _ in range(self.num_channel):
             self.total_hist_size *= self.num_bin
-    
+
     # image: (b, c, h, w), tensor
     def get_segmentation_from_hist(self, image, fore_hist, back_hist):
         assert image.shape[1] == self.num_channel
@@ -45,7 +46,7 @@ class SingleSoftHistograms(BaseModel):
         # image_bin_index = image_bin_index.view(batch_size, -1)  # (b, h*w)
         # image_pf = torch.gather(fore_hist, index=image_bin_index, dim=1)
         # image_pb = torch.gather(back_hist, index=image_bin_index, dim=1)
-        
+
         image_pf += self.eps
         image_pb += self.eps
         # output = (image_pf > image_pb).type(torch.float32) * 255
@@ -57,20 +58,20 @@ class SingleSoftHistograms(BaseModel):
     def image_value_to_bin_index(self, image):
         # eps = 1e-7
         # image[(torch.abs(image - self.hmax) < eps)] -= eps
-        
+
         tmp_input_image = torch.round(image * 255).long()
-        tmp_input_image = torch.where(tmp_input_image<=255, tmp_input_image, 255)
+        tmp_input_image = torch.where(tmp_input_image <= 255, tmp_input_image, 255)
         bin_index = tmp_input_image // (256 // self.num_bin)
 
         bin_coefficient = torch.tensor([self.num_channel - i - 1 for i in range(self.num_channel)],
-                                        device=image.device)
+                                       device=image.device)
         bin_coefficient = torch.pow(self.num_bin, bin_coefficient).long()
 
         for i in range(self.num_channel):
             bin_index[:, i, :, :] *= bin_coefficient[i]
 
         bin_index = torch.sum(bin_index, dim=1).long()
-        bin_index = torch.where(bin_index<self.total_hist_size, bin_index, self.total_hist_size-1)
+        bin_index = torch.where(bin_index < self.total_hist_size, bin_index, self.total_hist_size - 1)
 
         return bin_index
 
@@ -85,7 +86,7 @@ class SingleSoftHistograms(BaseModel):
 
         return image_pf.view(batch_size, height, width), image_pb.view(batch_size, height, width)
 
-    def histogram_calc(self, input_image, valid_line, normalize: bool=True):
+    def histogram_calc(self, input_image, valid_line, normalize: bool = True):
         # assert input_image.shape[1] == self.num_channel
         # assert torch.max(input_image) <= self.hmax and torch.min(input_image) >= self.hmin
         # eps = 1e-7
@@ -93,10 +94,11 @@ class SingleSoftHistograms(BaseModel):
         # input_image[(torch.abs(input_image - self.hmax) < eps)] -= eps
 
         tmp_input_image = torch.round(input_image * 255).long()
-        tmp_input_image = torch.where(tmp_input_image<=255, tmp_input_image, 255)
+        tmp_input_image = torch.where(tmp_input_image <= 255, tmp_input_image, 255)
         bin_index = tmp_input_image // (256 // self.num_bin)
 
-        bin_coefficient = torch.tensor([self.num_channel - i - 1 for i in range(self.num_channel)], device=input_image.device)
+        bin_coefficient = torch.tensor([self.num_channel - i - 1 for i in range(self.num_channel)],
+                                       device=input_image.device)
         bin_coefficient = torch.pow(self.num_bin, bin_coefficient).long()
         for i in range(self.num_channel):
             bin_index[:, i, :, :] *= bin_coefficient[i]
@@ -106,21 +108,22 @@ class SingleSoftHistograms(BaseModel):
         valid = valid_line.reshape(input_image.shape[0], -1)
         bin_index[~valid] = 0
         base_for_scatter[~valid] = 0
-        bin_index = torch.where(bin_index<self.total_hist_size, bin_index, 0)
-        base_for_scatter = torch.where(bin_index<self.total_hist_size, base_for_scatter, torch.tensor(0, dtype=torch.float32, device=input_image.device))
+        bin_index = torch.where(bin_index < self.total_hist_size, bin_index, 0)
+        base_for_scatter = torch.where(bin_index < self.total_hist_size, base_for_scatter,
+                                       torch.tensor(0, dtype=torch.float32, device=input_image.device))
 
         hist = torch.zeros((input_image.shape[0], self.total_hist_size), dtype=torch.float32, device=input_image.device)
         hist.scatter_add_(1, bin_index, base_for_scatter)
 
         if normalize:
             hist = nn.functional.normalize(hist, dim=-1, p=1)
-            
+
         return hist
 
     def forward(self, image, body2view_pose_data, camera_data, template_view):
         centers_in_body, centers_in_view, centers_in_image, centers_valid, normals_in_image, foreground_distance, background_distance, valid_data_line = \
-        calculate_basic_line_data(template_view, body2view_pose_data, camera_data, 1, 0)
-        fore_hist, back_hist = self.calculate_histogram(image, centers_in_image, centers_valid, normals_in_image, 
+            calculate_basic_line_data(template_view, body2view_pose_data, camera_data, 1, 0)
+        fore_hist, back_hist = self.calculate_histogram(image, centers_in_image, centers_valid, normals_in_image,
                                                         foreground_distance, background_distance, True)
         # return lines_image[0].permute(1, 2, 0)
         # import cv2
@@ -133,9 +136,10 @@ class SingleSoftHistograms(BaseModel):
         # cv2.imwrite('seg_image.png', seg_image[0].detach().cpu().numpy())
         # import ipdb
         # ipdb.set_trace()
-        return fore_hist, back_hist # , seg_image[0]
+        return fore_hist, back_hist  # , seg_image[0]
 
-    def calculate_histogram(self, image: torch.Tensor, centers_in_image: torch.Tensor, centers_valid: torch.Tensor, normals_in_image: torch.Tensor, 
+    def calculate_histogram(self, image: torch.Tensor, centers_in_image: torch.Tensor, centers_valid: torch.Tensor,
+                            normals_in_image: torch.Tensor,
                             foreground_distance: torch.Tensor, background_distance: torch.Tensor, noramlize: bool):
 
         device = centers_in_image.device
@@ -162,25 +166,28 @@ class SingleSoftHistograms(BaseModel):
         normals = normals_in_image
 
         interpolate_step = torch.arange(-self.considered_line_length, self.considered_line_length + 1, device=device) \
-                .unsqueeze(0).unsqueeze(0).unsqueeze(-1).expand(batch_size, n_correspondence_line, -1, 1)
+            .unsqueeze(0).unsqueeze(0).unsqueeze(-1).expand(batch_size, n_correspondence_line, -1, 1)
         normals = normals.unsqueeze(-2).expand(-1, -1, interpolate_step.shape[-2], -1)
         interpolate_normals = interpolate_step * normals
         centers = centers.unsqueeze(-2).expand(-1, -1, interpolate_step.shape[-2], -1)
         points_in_correspondence_lines = centers + interpolate_normals  # (b, n_correspondence_line, line_length, 2)
         points_in_correspondence_lines = torch.round(points_in_correspondence_lines)
-        points_valid1 = torch.logical_and(points_in_correspondence_lines[..., 0] >= 0, points_in_correspondence_lines[..., 0] < width)
-        points_valid2 = torch.logical_and(points_in_correspondence_lines[..., 1] >= 0, points_in_correspondence_lines[..., 1] < height)
+        points_valid1 = torch.logical_and(points_in_correspondence_lines[..., 0] >= 0,
+                                          points_in_correspondence_lines[..., 0] < width)
+        points_valid2 = torch.logical_and(points_in_correspondence_lines[..., 1] >= 0,
+                                          points_in_correspondence_lines[..., 1] < height)
         points_valid = torch.logical_and(points_valid1, points_valid2)
         # points_valid = (points_in_correspondence_lines[..., 0] >= 0) & \
         #                 (points_in_correspondence_lines[..., 0] < width) & \
         #                 (points_in_correspondence_lines[..., 1] >= 0) & \
         #                 (points_in_correspondence_lines[..., 1] < height)
-        
+
         points_in_correspondence_lines_x = (points_in_correspondence_lines[..., 0] / width) * 2 - 1
         points_in_correspondence_lines_y = (points_in_correspondence_lines[..., 1] / height) * 2 - 1
-        points = torch.cat((points_in_correspondence_lines_x[..., None], points_in_correspondence_lines_y[..., None]), dim=-1)
+        points = torch.cat((points_in_correspondence_lines_x[..., None], points_in_correspondence_lines_y[..., None]),
+                           dim=-1)
         lines_image = torch.nn.functional.grid_sample(image, points, mode='nearest', align_corners=False)
-        
+
         # valid_fore_line = interpolate_step.squeeze(-1) <= fore_line_length.unsqueeze(-1)
         # valid_back_line = interpolate_step.squeeze(-1) >= -back_line_length.unsqueeze(-1)
         # valid_line = torch.logical_and(valid_fore_line, valid_back_line).unsqueeze(1).expand(-1, n_channel, -1, -1)

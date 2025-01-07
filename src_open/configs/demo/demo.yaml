@@ -6,10 +6,11 @@ load_cfg: ${work_dir}/workspace/train_bop_deepac/logs-2024-01-08-15-52-47/train_
 load_model: ${work_dir}/workspace/train_bop_deepac/logs-2024-01-08-15-52-47/model_last.ckpt
 # -----------------
 
-data_dir: data/demo
-obj_name: Cat
-geometry_unit_in_meter: 0.001
+data_dir: data/wall_open
+obj_name: wall_open
+geometry_unit_in_meter: 1.0
 output_video: true
+output_image: true
 output_size: [320, 320]
 
 fore_learn_rate: 0.2
