@@ -33,8 +33,10 @@ def preprocess(conf, obj_dirs, obj_paths):
     geometry_unit_in_meter = float(conf.geometry_unit_in_meter)
     maximum_body_diameter = float(conf.maximum_body_diameter)
 
+    #3D 모델로 변환: obj_paths에서 obj파일 읽어오기
     body = Body('body_0', obj_paths, geometry_unit_in_meter, maximum_body_diameter,
                 normalize_to_origin=normalize_to_origin, device=device)
+    #카메라 위치를 결정: 구체의 반지름 기반. 나머지는 virtual camera의 intrinsic matrix 구성에 사용
     ggp = GenerateGeodesicPoses(body.maximum_body_diameter, sphere_radius, image_size,
                                 image_border_size, n_divide, device=device)
     view2world_matrix = ggp.view2world_matrix.transpose(0, 1)
@@ -42,10 +44,12 @@ def preprocess(conf, obj_dirs, obj_paths):
     viewer = Viewer((image_size[0].cpu().item(), image_size[0].cpu().item()),
                     view2world_pose, ggp.virtual_camera, device=device)
 
+    #렌더링 엔진 초기화
     render_geometry = RenderGeometry("render eigen", device=device)
     render_geometry.add_body(body)
     render_geometry.add_viewer(body.name, viewer)
     render_geometry.setup_render_context()
+
 
     print('start preprocess: ', obj_paths)
     template_views = 0

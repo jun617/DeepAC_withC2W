@@ -58,6 +58,7 @@ def main(cfg):
     K_path = os.path.join(data_dir, 'K.txt')
     template_path = os.path.join(data_dir, obj_name, 'pre_render', f'{obj_name}.pkl')
 
+    # Load Templates
     with open(template_path, "rb") as pkl_handle:
         pre_render_dict = pickle.load(pkl_handle)
     head = pre_render_dict['head']
@@ -66,33 +67,30 @@ def main(cfg):
     orientations = torch.from_numpy(pre_render_dict['orientation_in_body']).type(torch.float32)
 
     K = torch.from_numpy(np.loadtxt(K_path)).type(torch.float32)
+
+    # Load initial pose
     poses = torch.from_numpy(np.loadtxt(pose_path)).type(torch.float32)
     init_pose = poses[0]
     init_R = init_pose[:9].reshape(3, 3)
     init_t = init_pose[9:] * cfg.geometry_unit_in_meter
 
-    init_rot = torch.from_numpy(R.from_euler('x', -90, degrees=True).as_matrix()).type(torch.float32)
+    # in-plane rotation
+    init_rot = torch.from_numpy(R.from_euler('x', -90, degrees=True).as_matrix()).type(torch.float32) #blender상에서 보니 wall_open.obj에 local하게 orientation이 x 90이 먹여져있었음.
     init_R = init_R @ init_rot
-    #
+    # y-axis negation
     init_R[:, 1] = -init_R[:, 1]
     init_R[1, :] = -init_R[1, :]
     init_t[1] = -init_t[1]
 
     init_pose = Pose.from_Rt(init_R, init_t)
+
+    # Read input image sequence
     img_lists = glob.glob(img_dir + '/*.png', recursive=True) + glob.glob(img_dir + '/*.jpg', recursive=True)
     img_lists.sort()
 
 
     def read_camera_pose_as_pose(file_path):
-        """
-        카메라 포즈를 읽어 Pose 객체로 변환하고, Y축과 Z축을 플립하여 반환합니다.
-
-        Args:
-            file_path (str): camera_pose.txt 파일 경로
-
-        Returns:
-            Pose: 변환된 Pose 객체 (N x 12)
-        """
+        # Read Camera to ACCore Pose
         poses_data = []  # 순수 텐서를 저장할 리스트
         with open(file_path, 'r') as f:
             for line in f:
@@ -104,10 +102,9 @@ def main(cfg):
                 # 쿼터니언 -> 회전 행렬 변환
                 rotation_matrix = R.from_quat(quaternion).as_matrix()  # (3, 3)
 
-                z_angle = -90
-                # 휘센 뷰 제외 rotation offset 적용
+                z_angle = -90 # 휘센 뷰 제외 rotation offset 적용
                 z_rotation = R.from_euler('z', z_angle, degrees=True).as_matrix()
-                rotation_matrix = rotation_matrix @ z_rotation #잘되던 것
+                rotation_matrix = rotation_matrix @ z_rotation
 
                 # Y축 플립
                 rotation_matrix[:, 1] = -rotation_matrix[:, 1]  # Y축 플립

@@ -5,13 +5,18 @@ prerender_method: MyModel
 data_dir: "data/wall_open/"                       # where your mesh.obj saves
 batch_size: 1
 body_names: ['wall_open']                          # your mesh.obj name
-sphere_radius: 2.4
-maximum_body_diameter: 1.8
+sphere_radius: 0.6
+maximum_body_diameter: 1.2
+
+#wall_open
+#sphere_radius: 1.0
+#maximum_body_diameter: 1.2
+
 geometry_unit_in_meter: 1.0                # the mesh.obj will be transformed in the unit in meter
                                              # for example: if the mesh.obj is in cm, then geometry_unit_in_meter = 0.01;
                                              # if the mesh.obj is in mm, then geometry_unit_in_meter = 0.001;
-image_size: 2000
-image_border_size: 20
+image_size: 2000 #원래 2000
+image_border_size: 20 #원래 20
 n_divide: 4
 normalize_to_origin: False                   # fixed
 num_sample_contour_point: 200
