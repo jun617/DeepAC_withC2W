@@ -59,6 +59,9 @@ def crop(image, bbox2d, camera=None, return_bbox=False):
     top = np.clip(y - half_h_new, 0, h - 1)
     bottom = np.clip(y + half_h_new, 0, h - 1)
 
+    # print("width, height: ", w, h)
+    # print("left, right, top, bottom: ", left, right, top, bottom)
+
     image = image[top:bottom, left:right]
     ret = [image]
     if camera is not None:
@@ -74,6 +77,8 @@ def zero_pad(size, *images):
         padded = np.zeros((size, size)+image.shape[2:], dtype=image.dtype)
         padded[:h, :w] = image
         ret.append(padded)
+        ret.append(h)
+        ret.append(w)
     return ret
 
 def numpy_image_to_torch(image):

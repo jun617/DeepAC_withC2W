@@ -48,6 +48,7 @@ def project_p3d(camera_data, p3d):
 
     size = camera_data[..., :2]
     size = size.unsqueeze(-2)
+
     # valid2 = torch.all((p2d >= 0) & (p2d <= (size - 1)), -1)
     valid2 = torch.logical_and(p2d >= 0, p2d <= (size - 1))
     valid2 = torch.logical_and(valid2[..., 0], valid2[..., 1])

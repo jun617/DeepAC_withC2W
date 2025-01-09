@@ -46,7 +46,16 @@ class GenerateGeodesicPoses():
 
         # generate virtual camera intrinsic parameter
         focal_length = (image_size - image_border_size) * sphere_radius / maximum_body_diameter
+
+        # NEW!
+        # focal_length_x = torch.tensor(487.70806, device=device, dtype=torch.float32)
+        # focal_length_y = torch.tensor(488.87145, device=device, dtype=torch.float32)
+        #
+        # focal_length_x = torch.tensor([487.70806], device=device)
+        # focal_length_y = torch.tensor([488.87145], device=device)
         principal_point = image_size / 2
+
+        #카메라 위치 설정
         self.virtual_camera = Camera(torch.cat((image_size.unsqueeze(-1), image_size.unsqueeze(-1),
                                                 focal_length.unsqueeze(-1), focal_length.unsqueeze(-1),
                                                 principal_point.unsqueeze(-1), principal_point.unsqueeze(-1)), dim=1))
@@ -80,14 +89,17 @@ class GenerateGeodesicPoses():
         #
         # self.geodesic_points = torch.stack(self.geodesic_points).unsqueeze(0).expand(n_obj, -1, -1)
 
+        #view2world matrix 생성과정
+        #downwards:  월드좌표계 상에서 수직 아래 벡터
+
         downwards = torch.tensor([0.0, 1.0, 0.0], device=device, dtype=torch.float32)\
             .unsqueeze(0).unsqueeze(0).expand(n_obj, self.geodesic_points.shape[1], 3)
+
         view2world_matrix = torch.zeros(size=(n_obj, self.geodesic_points.shape[1], 4, 4),
                                         device=device, dtype=torch.float32)
-
-        view2world_matrix[..., :3, 3] = self.geodesic_points * sphere_radius
+        view2world_matrix[..., :3, 3] = self.geodesic_points * sphere_radius #geodesic point를 sphere radius상에 위치
         view2world_matrix[..., 3, 3] = 1
-        view2world_matrix[..., :3, 2] = -self.geodesic_points
+        view2world_matrix[..., :3, 2] = -self.geodesic_points #z방향 설정
         view2world_matrix[..., :3, 0] = torch.nn.functional.normalize(torch.cross(downwards, -self.geodesic_points), dim=-1)
         view2world_matrix = view2world_matrix.view(-1, 4, 4)
         view2world_matrix[torch.norm(view2world_matrix[..., :3, 0], dim=-1) == 0, :3, 0] = \
@@ -99,8 +111,8 @@ class GenerateGeodesicPoses():
         #                                                 [-0.6866,  0.6714, -0.2790, 0.3497],
         #                                                 [0, 0, 0, 1]], dtype=torch.float32, device=device)
         self.view2world_matrix = view2world_matrix.clone()
-        # draw_vertices_to_obj(view2world.cpu().numpy(), './data/geodesic_points.obj')
 
+        # draw_vertices_to_obj(view2world.cpu().numpy(), './data/geodesic_points.obj')
         # view2world_matrix[:, :, :3, 3] /= 0.001
         # draw_axis_to_obj(view2world_matrix[0, 122:123].cpu(), './data/camera_pose_template_122.obj')
         # draw_axis_to_obj(view2world_matrix[0, 0:1].cpu(), './data/camera_pose_template_0.obj')
