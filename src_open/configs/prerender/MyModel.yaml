@@ -2,15 +2,31 @@
 type: prerender
 
 prerender_method: MyModel
-data_dir: "data/wall_open/"                       # where your mesh.obj saves
+data_dir: "data/whisen_view/"                       # where your mesh.obj saves
 batch_size: 1
-body_names: ['wall_open']                          # your mesh.obj name
-sphere_radius: 1.2
-maximum_body_diameter: 1.2
+body_names: ['whisenview_simplified_filled']                          # your mesh.obj name
+sphere_radius: 2.4
+maximum_body_diameter: 2.4
 
 #wall_open
-#sphere_radius: 1.0
+#sphere_radius: 1.2
 #maximum_body_diameter: 1.2
+#latest_version: wall_open_filled
+
+#four_way
+#sphere_radius: 1.8
+#maximum_body_diameter: 1.2
+#lastest_version: fourway_filter
+
+#one_way
+#sphere_radius: 2.0
+#maximum_body_diameter: 2.0
+#latest_version: oneway_filter
+
+#whisen_view
+#sphere_radius: 2.4
+#maximum_body_diameter: 2.4
+#latest_version: whisenview_simplified_filled
 
 geometry_unit_in_meter: 1.0                # the mesh.obj will be transformed in the unit in meter
                                              # for example: if the mesh.obj is in cm, then geometry_unit_in_meter = 0.01;

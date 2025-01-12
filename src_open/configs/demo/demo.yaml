@@ -7,7 +7,7 @@ load_model: ${work_dir}/workspace/train_bop_deepac/logs-2024-01-08-15-52-47/mode
 # -----------------
 
 data_dir: data/wall_open
-obj_name: wall_open
+obj_name: wall_open_filled
 geometry_unit_in_meter: 1.0
 output_video: true
 output_image: true

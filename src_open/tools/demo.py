@@ -57,6 +57,7 @@ def main(cfg):
     pose_path = os.path.join(img_dir, 'pose.txt')
     K_path = os.path.join(data_dir, 'K.txt')
     template_path = os.path.join(data_dir, obj_name, 'pre_render', f'{obj_name}.pkl')
+    camera_pose_path = os.path.join(data_dir, 'camera_pose.txt')
 
     # Load Templates
     with open(template_path, "rb") as pkl_handle:
@@ -75,8 +76,17 @@ def main(cfg):
     init_t = init_pose[9:] * cfg.geometry_unit_in_meter
 
     # in-plane rotation
-    init_rot = torch.from_numpy(R.from_euler('x', -90, degrees=True).as_matrix()).type(torch.float32) #blender상에서 보니 wall_open.obj에 local하게 orientation이 x 90이 먹여져있었음.
+    #wall_open: x -90
+    #four_way: x 90
+    #one_way: x 90
+    #whisen_view: x -90
+    if "wall_open" in data_dir or "whisen_view" in data_dir:
+        x_axis = -90.0
+    else:
+        x_axis = 90.0
+    init_rot = torch.from_numpy(R.from_euler('x', x_axis, degrees=True).as_matrix()).type(torch.float32)
     init_R = init_R @ init_rot
+
     # y-axis negation
     init_R[:, 1] = -init_R[:, 1]
     init_R[1, :] = -init_R[1, :]
@@ -102,7 +112,10 @@ def main(cfg):
                 # 쿼터니언 -> 회전 행렬 변환
                 rotation_matrix = R.from_quat(quaternion).as_matrix()  # (3, 3)
 
-                z_angle = -90 # 휘센 뷰 제외 rotation offset 적용
+                if "whisen_view" in data_dir:
+                    z_angle = 0
+                else:
+                    z_angle = -90 # 휘센 뷰 제외 rotation offset 적용
                 z_rotation = R.from_euler('z', z_angle, degrees=True).as_matrix()
                 rotation_matrix = rotation_matrix @ z_rotation
 
@@ -122,8 +135,6 @@ def main(cfg):
         print("Stacked pose tensor shape:", poses_tensor.shape)
         return Pose(poses_tensor)
 
-    # 파일 경로
-    camera_pose_path = "/home/ohj/DeepAC/data/wall_open/camera_pose.txt"
     # 카메라 포즈 읽기 및 변환
     camera_pose = read_camera_pose_as_pose(camera_pose_path)
 
@@ -230,6 +241,9 @@ def main(cfg):
         }
         pred = model._forward(data, visualize=False, tracking=True)
 
+        #for camera pose debugging
+        # lost = True
+
         # print(f'Frame {i}: centers_valid_ratio: {torch.mean(centers_valid.float())}')
         # 중요한 Contour가 밖으로 나갔을 때 반영하는 방법?
         if torch.mean(centers_valid.float()) <= 0.6:
@@ -270,8 +284,9 @@ def main(cfg):
             cv2.imwrite(frame_path, ori_image)
 
         init_pose = (Pose.from_Rt(camera_pose[i + 1].R, camera_pose[i + 1].t)).inv() @ Pose.from_Rt(camera_pose[i].R, camera_pose[i].t) @ pred['opt_body2view_pose'][-1][0].cpu()
+        # init_pose = pred['opt_body2view_pose'][-1][0].cpu()
         index = get_closest_template_view_index(init_pose, orientations)
-
+        # print(f"Frame {i+1} index: {index}")
         # init_pose = pred['opt_body2view_pose'][-1][0].cpu()
         # index = get_closest_template_view_index(init_pose, orientations)
         # print(f"for Frame {i}, template index : {index}")
