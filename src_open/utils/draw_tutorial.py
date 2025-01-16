@@ -96,7 +96,7 @@ def draw_correspondence_lines_in_image(image, centers, valid, normals=None,
         if valid[i]:
             center = centers[i]
             normal = normals[i]
-            cv2.circle(image, (int(center[0]), int(center[1])), 1, center_color, -1)
+            cv2.circle(image, (int(center[0]), int(center[1])), 3, center_color, -1)
             if foredist is not None:
                 if isinstance(foredist, np.int64) or isinstance(foredist, int):
                     normal_len = foredist

@@ -46,6 +46,7 @@ class GenerateGeodesicPoses():
 
         # generate virtual camera intrinsic parameter
         focal_length = (image_size - image_border_size) * sphere_radius / maximum_body_diameter
+        # print(focal_length)
 
         # NEW!
         # focal_length_x = torch.tensor(487.70806, device=device, dtype=torch.float32)

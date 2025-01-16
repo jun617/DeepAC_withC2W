@@ -186,6 +186,26 @@ def main(cfg):
 
         return centers_valid
 
+    def calculate_pose_difference(init_pose, optimized_pose):
+        # 1. Rotation difference
+        init_R = init_pose[:3, :3]  # 초기 회전 행렬
+        opt_R = optimized_pose[:3, :3]  # 최적화된 회전 행렬
+        relative_R = opt_R @ init_R.T  # 상대 회전 행렬
+        euler_angles = R.from_matrix(relative_R.cpu().numpy()).as_euler('xyz', degrees=True)
+        x_diff_rot, y_diff_rot, z_diff_rot = euler_angles  # x, y, z축 회전 차이 (도 단위)
+
+        # 2. Translation difference
+        init_t = init_pose[:3, 3]  # 초기 변환 벡터
+        opt_t = optimized_pose[:3, 3]  # 최적화된 변환 벡터
+        translation_diff = opt_t - init_t  # [dx, dy, dz]
+        dx_trans, dy_trans, dz_trans = translation_diff.tolist()
+
+        # 3. 결과 반환
+        return {
+            'rotation_diff': {'x': x_diff_rot, 'y': y_diff_rot, 'z': z_diff_rot},
+            'translation_diff': {'x': dx_trans, 'y': dy_trans, 'z': dz_trans}
+        }
+
     if cfg.output_video:
         video = cv2.VideoWriter(os.path.join(logger.log_dir, obj_name + ".avi"),  # 
                                 cv2.VideoWriter_fourcc('M', 'P', '4', '2'), 30, (640, 480))
@@ -193,6 +213,10 @@ def main(cfg):
     if cfg.output_image:
         frame_output_dir = os.path.join(logger.log_dir, "frames")
         os.makedirs(frame_output_dir, exist_ok=True)
+
+    if cfg.output_closest_template:
+        merged_frame_output_dir = os.path.join(logger.log_dir, "frames_with_template")
+        os.makedirs(merged_frame_output_dir, exist_ok=True)
 
     for i, img_path in enumerate(tqdm(img_lists)):
         ori_image = read_image(img_path)
@@ -202,6 +226,7 @@ def main(cfg):
 
         indices = get_closest_k_template_view_index(init_pose, orientations,
                                                     data_conf.get_top_k_template_views * data_conf.skip_template_view)
+        index = indices[0]
         closest_template_views = torch.stack([template_views[ind * num_sample_contour_points:(ind + 1) * num_sample_contour_points, :]
                                                 for ind in indices[::data_conf.skip_template_view]])
         closest_orientations_in_body = orientations[indices[::data_conf.skip_template_view]]
@@ -223,13 +248,31 @@ def main(cfg):
             total_fore_hist, total_back_hist = \
                 model.histogram.calculate_histogram(img[None], centers_in_image, centers_valid, normals_in_image, 
                                                     foreground_distance, background_distance, True)
+            lost = False
 
         centers_valid = update_validity_with_crop(centers_in_image, centers_valid, w_crop, h_crop)
 
-        original_closest_template_views = closest_template_views.detach().clone()
-        original_closest_orientations_in_body = closest_orientations_in_body.detach().clone()
+        #for camera pose debugging
+        # lost = True
 
-        lost = False
+        # print(f'Frame {i}: centers_valid_ratio: {torch.mean(centers_valid.float())}')
+        # 중요한 Contour가 밖으로 나갔을 때 반영하는 방법?
+        valid_rate = torch.mean(centers_valid.float())
+        if lost:
+            if valid_rate > 0.9:
+                lost = False
+                _, _, centers_in_image, centers_valid, normals_in_image, foreground_distance, background_distance, _ = \
+                    calculate_basic_line_data(closest_template_views[None][:, 0], init_pose[None]._data,
+                                              camera[None]._data, 1, 0)
+                total_fore_hist, total_back_hist = \
+                    model.histogram.calculate_histogram(img[None], centers_in_image, centers_valid, normals_in_image,
+                                                        foreground_distance, background_distance, True)
+        else:
+            if valid_rate < 0.7:
+                lost = True
+                original_closest_template_views = closest_template_views.detach().clone()
+                original_closest_orientations_in_body = closest_orientations_in_body.detach().clone()
+
         data = {
             'image': img[None].cuda(),
             'camera': camera[None].cuda(),
@@ -241,19 +284,15 @@ def main(cfg):
         }
         pred = model._forward(data, visualize=False, tracking=True)
 
-        #for camera pose debugging
-        # lost = True
-
-        # print(f'Frame {i}: centers_valid_ratio: {torch.mean(centers_valid.float())}')
-        # 중요한 Contour가 밖으로 나갔을 때 반영하는 방법?
-        if torch.mean(centers_valid.float()) <= 0.6:
-            lost = True
         if lost:
             pred['opt_body2view_pose'][-1][0] = init_pose[None].cuda()
             pred['closest_template_views'] = original_closest_template_views[None].cuda()
             pred['closest_orientations_in_body'] = original_closest_orientations_in_body[None].cuda()
+        else:
+            print(f"Frame {i} : init_pose {init_pose.numpy()}")
+            #print(calculate_pose_difference(init_pose, pred['opt_body2view_pose'][-1][0]))
 
-        if cfg.output_video and cfg.output_image:
+        if cfg.output_video and cfg.output_image and cfg.output_closest_template:
             pred['optimizing_result_imgs'] = []
             model.visualize_optimization(pred['opt_body2view_pose'][-1], pred)
             ori_image = read_image(img_path)
@@ -273,15 +312,40 @@ def main(cfg):
             resized_pred_image = cv2.resize(pred['optimizing_result_imgs'][0][0][:h_crop, :w_crop], (x2 - x1, y2 - y1), interpolation=cv2.INTER_LINEAR)
             ori_image[y1:y2, x1:x2] = resized_pred_image
 
+            ori_image = cv2.UMat(ori_image)
             if lost:
-                ori_image = cv2.UMat(ori_image)
                 cv2.putText(ori_image, "LOST", (520, 50), cv2.FONT_HERSHEY_SIMPLEX, 1.5, (0, 0, 255), 5, cv2.LINE_AA)
             video.write(ori_image)
+            ori_image = ori_image.get() # UMat to numpy
 
             # 프레임 이미지 저장 경로 설정
             frame_path = os.path.join(frame_output_dir, f"frame_{i:04d}.png")
             # 병합된 이미지 저장
             cv2.imwrite(frame_path, ori_image)
+
+            merged_frame_path = os.path.join(merged_frame_output_dir, f"frame_{i:04d}.png")
+
+            closest_template_path = os.path.join(data_dir, obj_name, 'pre_render', 'mask', str(index.item()).zfill(6) + '.jpg')
+            closest_template_img = read_image(closest_template_path)
+
+            if ori_image.shape[0] != closest_template_img.shape[0]:
+                # 원본 이미지 높이
+                target_height = ori_image.shape[0]
+
+                # 원본 비율 유지한 새로운 너비 계산
+                orig_height, orig_width = closest_template_img.shape[:2]
+                new_width = int((target_height / orig_height) * orig_width)
+
+                # 비율 유지하면서 새로운 크기로 변환
+                closest_template_img = cv2.resize(closest_template_img, (new_width, target_height))
+
+            # 좌우로 병합 (hstack 사용)
+            merged_image = np.hstack((ori_image, closest_template_img))
+
+            # 병합된 이미지 저장
+            cv2.imwrite(merged_frame_path, merged_image)
+
+
 
         init_pose = (Pose.from_Rt(camera_pose[i + 1].R, camera_pose[i + 1].t)).inv() @ Pose.from_Rt(camera_pose[i].R, camera_pose[i].t) @ pred['opt_body2view_pose'][-1][0].cpu()
         # init_pose = pred['opt_body2view_pose'][-1][0].cpu()

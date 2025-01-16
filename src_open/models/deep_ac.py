@@ -482,6 +482,8 @@ class DeepAC(BaseModel):
         return scale, fscale, line_length, line_length_minus_1, line_length_minus_1_half, line_length_half_minus_1
 
 
+
+
     def visualize_optimization(self, body2view_pose, data):
         import cv2
         from ..utils.draw_tutorial import draw_correspondence_lines_in_image

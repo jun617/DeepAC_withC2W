@@ -2,10 +2,10 @@
 type: prerender
 
 prerender_method: MyModel
-data_dir: "data/whisen_view/"                       # where your mesh.obj saves
+data_dir: "data/wall_open/"                       # where your mesh.obj saves
 batch_size: 1
-body_names: ['whisenview_simplified_filled']                          # your mesh.obj name
-sphere_radius: 2.4
+body_names: ['wall_open_filled']                          # your mesh.obj name
+sphere_radius: 1.2
 maximum_body_diameter: 2.4
 
 #wall_open
@@ -31,7 +31,7 @@ maximum_body_diameter: 2.4
 geometry_unit_in_meter: 1.0                # the mesh.obj will be transformed in the unit in meter
                                              # for example: if the mesh.obj is in cm, then geometry_unit_in_meter = 0.01;
                                              # if the mesh.obj is in mm, then geometry_unit_in_meter = 0.001;
-image_size: 2000 #원래 2000
+image_size: 1000 #원래 2000
 image_border_size: 20 #원래 20
 n_divide: 4
 normalize_to_origin: False                   # fixed
