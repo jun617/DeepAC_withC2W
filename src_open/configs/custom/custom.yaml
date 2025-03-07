@@ -1,0 +1,19 @@
+# @package _global_
+type: custom
+
+save_dir: ${work_dir}/workspace/custom
+load_cfg: ${work_dir}/workspace/train_bop_deepac/logs-2024-01-08-15-52-47/train_cfg.yml
+load_model: ${work_dir}/workspace/train_bop_deepac/logs-2024-01-08-15-52-47/model_last.ckpt
+# -----------------
+
+data_dir: data/whisen_view
+obj_name: whisenview_simplified_filled
+geometry_unit_in_meter: 1.0
+output_video: true
+output_image: true
+output_closest_template: true
+output_size: [320, 320]
+
+fore_learn_rate: 0.2
+back_learn_rate: 0.2
+gpu_id: '0' # 0, 1
