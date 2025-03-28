@@ -237,7 +237,9 @@ class BoundaryPredictor(nn.Module):
             function_lookup_f = 0.5 - function_amplitude * torch.tanh(x / (2 * function_slop))
         
         function_lookup_b = 1 - function_lookup_f
-        min_variance_laplace = (1.0 / (2.0 * torch.pow(torch.atanh(2.0 * function_amplitude[..., 0]), 2.0))).float()
+        #min_variance_laplace = (1.0 / (2.0 * torch.pow(torch.atanh(2.0 * function_amplitude[..., 0]), 2.0))).float()
+        min_variance_laplace = (2.0 / torch.pow(torch.log((1 + 2.0 * function_amplitude[..., 0]) / (1 - 2.0 * function_amplitude[..., 0])), 2.0)).float()
+
         min_variance_gaussian = function_slop[..., 0]
         min_variance = torch.max(min_variance_laplace, min_variance_gaussian)
 

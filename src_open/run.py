@@ -35,8 +35,16 @@ def deploy_deepac(cfg):
     from .tools.deploy_deepac import main
     main(cfg)
 
+def export_onnx(cfg):
+    from .tools.export_onnx import main
+    main(cfg)
+
 def demo(cfg):
     from .tools.demo import main
+    main(cfg)
+
+def custom(cfg):
+    from .tools.custom import main
     main(cfg)
 
 @hydra.main(config_path='configs/', config_name='config.yaml')

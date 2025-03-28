@@ -76,7 +76,7 @@ def get_bbox_from_p2d(p2d):
 
     bbox_min, _ = torch.min(p2d, dim=-2)
     bbox_max, _ = torch.max(p2d, dim=-2)
-
+    # print(f'{bbox_min} {bbox_max}')
     bbox_center = (bbox_min + bbox_max) / 2
     bbox_wh = bbox_max - bbox_min
     bbox = torch.cat((bbox_center, bbox_wh), dim=-1)

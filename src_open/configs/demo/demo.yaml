@@ -14,6 +14,9 @@ output_image: true
 output_closest_template: true
 output_size: [320, 320]
 
+# whisenview_simplified_filled
+#fourway_filter
+#oneway_filter
 fore_learn_rate: 0.2
 back_learn_rate: 0.2
 gpu_id: '0' # 0, 1

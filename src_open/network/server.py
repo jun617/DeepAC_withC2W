@@ -55,6 +55,21 @@ class NetworkServer:
         self.running = True
         self.receive_thread = threading.Thread(target=self._receive_loop)
         self.receive_thread.start()
+        # self.server_socket.listen(5)  # 여러 연결을 대기할 수 있음
+        # print(f"[Server] Listening on {self.host}:{self.port}")
+        #
+        # while True:
+        #     print("[Server] Waiting for a new client connection...")
+        #     self.client_socket, addr = self.server_socket.accept()
+        #     print(f"[Server] Client connected: {addr}")
+        #
+        #     self.running = True
+        #     self.receive_thread = threading.Thread(target=self._receive_loop)
+        #     self.receive_thread.start()
+        #
+        #     # 현재 클라이언트와의 연결이 종료될 때까지 기다림
+        #     self.receive_thread.join()
+        #     print("[Server] Client disconnected, restarting accept...")
 
     def _receive_loop(self):
         """
@@ -162,7 +177,7 @@ class NetworkServer:
         frame_id, header, img = latest_frame
         return frame_id, header, img
 
-    def send_response_pose(self, refined_pose, camera_pose):
+    def send_response_pose(self, refined_pose, camera_pose, lost_state):
         """
         클라이언트에게 refined_pose와 camera_pose만 전송한다.
         전송 프로토콜:
@@ -185,7 +200,7 @@ class NetworkServer:
             header.extend((0).to_bytes(4, 'little', signed=True))
             # 응답 payload 구성 (56바이트: 14개의 float)
             # refined_pose와 camera_pose는 각각 (pos_x, pos_y, pos_z, rot_x, rot_y, rot_z, rot_w) 형태
-            payload = struct.pack('<7f', *refined_pose) + struct.pack('<7f', *camera_pose)
+            payload = struct.pack('<7f', *refined_pose) + struct.pack('<7f', *camera_pose) + struct.pack('<1f', lost_state)
             # 최종 전송: 헤더(12바이트) + payload(56바이트) = 68바이트
             packet = header + payload
             self.client_socket.send(packet)
@@ -204,55 +219,26 @@ class NetworkServer:
         print("[Server] Stopped.")
 
 
-if __name__ == '__main__':
-    # 호스트와 포트는 필요에 맞게 수정
-    server = NetworkServer(host='192.168.0.6', port=7777, save_img=True, save_data=True)
-    server.start()
-    print("[MainThread] Server started, waiting for frames...")
-
-    try:
-        while True:
-            # 최신 프레임을 가져온다.
-            frame_id, header, img = server.get_latest_frame()
-            if frame_id is None:
-                continue
-
-            # 여기서 원하는 CV 처리 등을 수행.
-            # 예시로 refined_pose와 camera_pose를 임의 값으로 설정:
-            refined_pose = (0, 0, 0, 0, 0, 0, 1)  # pos(0,0,0), rot(0,0,0,1)
-            camera_pose = (1, 1, 1, 0, 0, 0, 1)   # pos(1,1,1), rot(0,0,0,1)
-
-            server.send_response_pose(refined_pose, camera_pose)
-    except KeyboardInterrupt:
-        pass
-    finally:
-        server.stop()
-
-# import network.server as Server
-#
-# def main():
-#     # NetworkServer 클래스를 Server 모듈 내에서 가져옴
-#     server = Server.NetworkServer(host='192.168.0.6', port=7777, save_img=True, save_data=True)
+# if __name__ == '__main__':
+#     # 호스트와 포트는 필요에 맞게 수정
+#     server = NetworkServer(host='192.168.0.6', port=7777, save_img=True, save_data=True)
 #     server.start()
 #     print("[MainThread] Server started, waiting for frames...")
 #
 #     try:
 #         while True:
-#             # 최신 프레임을 가져옴
+#             # 최신 프레임을 가져온다.
 #             frame_id, header, img = server.get_latest_frame()
 #             if frame_id is None:
 #                 continue
 #
-#             # 여기서 원하는 CV 처리 등을 수행
+#             # 여기서 원하는 CV 처리 등을 수행.
 #             # 예시로 refined_pose와 camera_pose를 임의 값으로 설정:
-#             refined_pose = (0, 0, 0, 0, 0, 0, 1)   # pos(0,0,0), rot(0,0,0,1)
-#             camera_pose = (1, 1, 1, 0, 0, 0, 1)     # pos(1,1,1), rot(0,0,0,1)
+#             refined_pose = (0, 0, 0, 0, 0, 0, 1)  # pos(0,0,0), rot(0,0,0,1)
+#             camera_pose = (1, 1, 1, 0, 0, 0, 1)   # pos(1,1,1), rot(0,0,0,1)
 #
 #             server.send_response_pose(refined_pose, camera_pose)
 #     except KeyboardInterrupt:
 #         pass
 #     finally:
-#         server.stop()
-#
-# if __name__ == '__main__':
-#     main()
+#         server.stop() hey explain this code to me

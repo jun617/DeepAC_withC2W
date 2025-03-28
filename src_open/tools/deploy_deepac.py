@@ -8,6 +8,7 @@ import coremltools.proto.FeatureTypes_pb2 as ft
 import cv2
 import copy
 import warnings
+import pdb
 
 from ..utils.geometry.wrappers import Pose
 from ..models import get_model
@@ -64,8 +65,8 @@ class CropAndResizeImage(nn.Module):
         #     img_scale = torch.nn.functional.interpolate(img_padded, size=(hh, ww), mode='bilinear')
         #     imgs_scale.append(img_scale)
         
-        import ipdb
-        ipdb.set_trace()
+        #import ipdb
+        #ipdb.set_trace()
  
 
 def main(cfg):
@@ -107,6 +108,7 @@ def main(cfg):
     # crop_resize_model = CropAndResizeImage(train_cfg.data.resize, train_cfg.data.pad, train_cfg.data.crop_border)
     # crop_resize_model(ori_image, bbox)
 
+    ###############################################################################
     deploy_input = np.load('data/deploy_input.npz')
     image_input = torch.from_numpy(deploy_input['image'])
     pose_data_input = torch.from_numpy(deploy_input['pose'])
@@ -125,10 +127,12 @@ def main(cfg):
     jit_histogram_model = torch.jit.trace(histogram_model, example_inputs=inp).eval()
     fore_hist, back_hist = jit_histogram_model(image_input, pose_data_input, camera_data_input, template_view)
 
+    ###############################################################################
     extractor_model = reparameterize_model(extractor_model)
     jit_extractor_model = torch.jit.trace(extractor_model, example_inputs=image_input).eval()
     feature_inputs = jit_extractor_model(image_input)
 
+    ###############################################################################
     feature_inputs = list(feature_inputs)
     # template_view_n = template_view[:, None]
     jit_contour_feature_models = []
@@ -140,27 +144,58 @@ def main(cfg):
         # camera_data_inputs[i] = camera_data_inputs[i][:, None]
         inp = (image_inputs[i], feature_inputs[i], pose_data_inputs[i], camera_data_inputs[i], template_view, fore_hist, back_hist)
         jit_contour_feature_models.append(torch.jit.trace(contour_feature_model, example_inputs=inp).eval())
+
+    ###############################################################################
     normals_in_image, centers_in_image, centers_in_body, \
     lines_image_pf_segments, lines_image_pb_segments, valid_data_line, lines_amplitude, lines_slop, lines_feature = \
         jit_contour_feature_models[0](image_inputs[0], feature_inputs[0], pose_data_inputs[0],
                                       camera_data_inputs[0], template_view, fore_hist, back_hist)
-    
+
+    # 원하는 shape를 확인하기 위해 print 추가
+    print(f"lines_feature shape: {lines_feature.shape}")
+    print(f"lines_image_pf_segments shape: {lines_image_pf_segments.shape}")
+    print(f"lines_image_pb_segments shape: {lines_image_pb_segments.shape}")
+    print(f"lines_slop shape: {lines_slop.shape}")
+    print(f"lines_amplitude shape: {lines_amplitude.shape}")
+    #pdb.set_trace()
+
     inp = (lines_feature, lines_image_pf_segments, lines_image_pb_segments, lines_slop, lines_amplitude)
     jit_boundary_predictor_model = torch.jit.trace(boundary_predictor_model, example_inputs=inp).eval()
 
+    ###############################################################################
     # distributions, distribution_mean, distribution_variance, distribution_standard_deviation = \
     distributions, distribution_mean, distribution_uncertainties = \
         jit_boundary_predictor_model(lines_feature, lines_image_pf_segments, lines_image_pb_segments, lines_slop, lines_amplitude)
     # distribution_uncertainties = 1 / distribution_variance
-    
+
+    print(f"normals_in_image shape: {normals_in_image.shape}")
+    print(f"centers_in_image shape: {centers_in_image.shape}")
+    print(f"centers_in_body shape: {centers_in_body.shape}")
+    print(f"valid_data_line shape: {valid_data_line.shape}")
+    # distributions 등 다른 텐서도 shape 확인 가능
+    print(f"distributions shape: {distributions.shape}")
+    print(f"distribution_mean shape: {distribution_mean.shape}")
+    print(f"distribution_uncertainties shape: {distribution_uncertainties.shape}")
+    pdb.set_trace()
+
     inp = (normals_in_image, centers_in_image, centers_in_body, pose_data_inputs[0], camera_data_inputs[0], 
            valid_data_line, distributions, distribution_mean, distribution_uncertainties)
     jit_derivative_calculator_model = torch.jit.trace(derivative_calculator_model, example_inputs=inp).eval()
+
+
+    ###############################################################################
+    ###############################################################################
+    ###############################################################################
+
+
+
 
     image_input = ct.TensorType(name='image', shape=image_input.shape, dtype=np.float32)
     pose_data_input = ct.TensorType(name='pose_data', shape=pose_data_input.shape, dtype=np.float32)
     camera_data_input = ct.TensorType(name='camera_data', shape=camera_data_input.shape, dtype=np.float32)
     template_view = ct.TensorType(name='template_view', shape=template_view.shape, dtype=np.float32)
+
+    ###############################################################################
     histogram_mlmodel = ct.convert(jit_histogram_model, inputs=[image_input, pose_data_input, camera_data_input, template_view],
                                    minimum_deployment_target=ct.target.iOS16,
                                    outputs=[ct.TensorType(name='fore_hist'), ct.TensorType(name='back_hist')], # ct.TensorType(name='seg_image')],
@@ -173,7 +208,8 @@ def main(cfg):
                                    # compute_units=ct.ComputeUnit.ALL
                                    )
     histogram_mlmodel.save(os.path.join(logger.log_dir, "histogram.mlpackage"))
-    
+
+    ###############################################################################
     extractor_mlmodel = ct.convert(jit_extractor_model, inputs=[image_input],
                                    outputs=[ct.TensorType(name='feature0'), ct.TensorType(name='feature1'), ct.TensorType(name='feature2')],
                                    minimum_deployment_target=ct.target.iOS16,
@@ -186,6 +222,7 @@ def main(cfg):
                                    )
     extractor_mlmodel.save(os.path.join(logger.log_dir, "extractor.mlpackage"))
 
+    ###############################################################################
     fore_hist = ct.TensorType(name='fore_hist', shape=fore_hist.shape, dtype=np.float32)
     back_hist = ct.TensorType(name='back_hist', shape=back_hist.shape, dtype=np.float32)
     jit_contour_feature_mlmodels = []
@@ -215,6 +252,7 @@ def main(cfg):
                                                         ))
         jit_contour_feature_mlmodels[i].save(os.path.join(logger.log_dir, f"contour_feature_extractor{i}.mlpackage"))
 
+    ###############################################################################
     lines_feature = ct.TensorType(name='lines_feature', shape=lines_feature.shape, dtype=np.float32)
     lines_image_pf_segments = ct.TensorType(name='lines_image_pf_segments', shape=lines_image_pf_segments.shape, dtype=np.float32)
     lines_image_pb_segments = ct.TensorType(name='lines_image_pb_segments', shape=lines_image_pb_segments.shape, dtype=np.float32) 
@@ -238,6 +276,7 @@ def main(cfg):
                                             )
     boundary_predictor_mlmodel.save(os.path.join(logger.log_dir, "boundary_predictor.mlpackage"))
 
+    ###############################################################################
     normals_in_image = ct.TensorType(name='normals_in_image', shape=normals_in_image.shape, dtype=np.float32)
     centers_in_image = ct.TensorType(name='centers_in_image', shape=centers_in_image.shape, dtype=np.float32)
     centers_in_body = ct.TensorType(name='centers_in_body', shape=centers_in_body.shape, dtype=np.float32)
@@ -259,6 +298,7 @@ def main(cfg):
                                             )
     derivative_calculator_mlmodel.save(os.path.join(logger.log_dir, "derivative_calculator.mlpackage"))
 
+    ###############################################################################
     # import ipdb
     # ipdb.set_trace()
 

@@ -334,6 +334,7 @@ class Camera(TensorWrapper):
         assert p2d.shape[-1] == 2
         # assert p2d.shape[:-2] == self.shape  # allow broadcasting
         size = self.size.unsqueeze(-2)
+        # print(f'image size: {size}')
         valid = torch.all((p2d >= 0) & (p2d <= (size - 1)), -1)
         return valid
 
