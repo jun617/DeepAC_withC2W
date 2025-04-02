@@ -6,7 +6,7 @@
 > [Long Wang](https://wanglongzju.github.io/wanglong.github.io/)<sup>\*</sup>, [Shen Yan]()<sup>\*</sup>, [Jianan Zhen](), [Yu Liu](), [Maojun Zhang](), [Guofeng Zhang](http://www.cad.zju.edu.cn/home/gfzhang/), [Xiaowei Zhou](https://xzhou.me)                              
 > ICCV 2023
 
-
+## "Have to download train_BOP yaml file"
 <!-- ![demo_vid](assets/demo.gif) # TODO -->
 
 ## Installation
